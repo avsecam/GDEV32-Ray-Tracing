@@ -188,9 +188,8 @@ struct Image
 Ray GetRayThruPixel(const Camera &camera, const int& pixelX, const int& pixelY)
 {
     Ray ray;
-    ray.origin = glm::vec3(0.0f); 
-    ray.direction = glm::vec3(0.0f);
-
+    ray.origin = camera.position;
+    ray.direction = (pixelY - ray.origin.y) / (pixelX - ray.origin.x);
     
     return ray;
 }
