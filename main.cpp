@@ -191,6 +191,7 @@ Ray GetRayThruPixel(const Camera &camera, const int& pixelX, const int& pixelY)
     ray.origin = glm::vec3(0.0f); 
     ray.direction = glm::vec3(0.0f);
 
+    
     return ray;
 }
 
@@ -224,7 +225,7 @@ IntersectionInfo Raycast(const Ray& ray, const Scene &scene)
  */
 glm::vec3 RayTrace(const Ray& ray, const Scene& scene, const Camera& camera, int maxDepth = 1)
 {
-    glm::vec3 color(0.0f);
+    glm::vec3 color(0.5f);
     return color;
 }
 
@@ -238,6 +239,26 @@ int main()
     camera.imageWidth = 640;
     camera.imageHeight = 480;
     int maxDepth = 1;
+
+
+    camera.position = glm::vec3(0.0f, 0.0f, 3.0f);
+    camera.lookTarget = glm::vec3(0.0f, 0.0f, 0.0f);
+    camera.globalUp = glm::vec3(0.0f, 1.0f, 0.0f);
+    camera.fovY = 45.0f;
+    camera.focalLength = 1.0f;
+    camera.imageWidth = 640;
+    camera.imageHeight = 480;
+
+
+    Sphere *sphere = new Sphere();
+    sphere->center = glm::vec3(0);
+    sphere->radius = 1.0f;
+    sphere->material.diffuse = glm::vec3(1, 0, 0);
+    
+    scene.objects.push_back(sphere);
+
+
+
 
     Image image(camera.imageWidth, camera.imageHeight);
     for (int y = 0; y < image.height; ++y)
