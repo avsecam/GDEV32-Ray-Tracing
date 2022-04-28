@@ -8,6 +8,8 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
 
+const NO_INTERSECTION == -1.0f;
+
 struct Ray
 {
 	glm::vec3 origin;		 // Ray origin
@@ -73,25 +75,31 @@ struct Sphere : public SceneObject
 		float t1, t2;
 
 		// The ray does not intersect with the sphere.
-		if (discriminant < 0) s = -1.0f;
+		if (discriminant < 0)
+			s = NO_INTERSECTION;
 
 		// The ray intersects with the sphere once.
-		else if (discriminant = 0) s = -b;
+		else if (discriminant = 0)
+			s = -b;
 
 		else
 		{
 			t1 = -b + glm::sqrt(discriminant);
 			t2 = -b - glm::sqrt(discriminant);
-			
+
 			// The ray starts outside the sphere and moves away from it.
-			if (t1 < 0 and t2 < 0) s = -1.0f;
+			if (t1 < 0 and t2 < 0)
+				s = NO_INTERSECTION;
 
 			// The ray starts outside or inside the sphere and intersects it once or twice. Get the smaller and positive root.
-			else {
+			else
 				s = (t1 > 0 and t1 < t2) ? t1 : t2;
-			}
 		}
 
+		if (s != NO_INTERSECTION)
+		{
+			outIntersectionPoint = incomingRay.origin + (s * incomingRay.direction);
+		}
 		return s;
 	}
 };
@@ -229,13 +237,31 @@ Ray GetRayThruPixel(const Camera &camera, const int &pixelX, const int &pixelY)
 IntersectionInfo Raycast(const Ray &ray, const Scene &scene)
 {
 	IntersectionInfo ret;
+	float tTemp;
 	ret.incomingRay = ray;
 
-	// Fields that need to be populated:
-	ret.intersectionPoint = glm::vec3(0.0f);	// Intersection point
-	ret.intersectionNormal = glm::vec3(0.0f); // Intersection normal
-	ret.t = 0.0f;															// Distance from ray origin to intersection point
-	ret.obj = nullptr;												// First object hit by the ray. Set to nullptr if the ray does not hit anything
+	ret.obj = nullptr; // First object hit by the ray. Set to nullptr if the ray does not hit anything
+
+	// Go through all objects in the scene.
+	// If the object is closer to the ray origin than the last object, overwrite the value of ret.t.
+	for (int i = 0; i < scene.objects.size(); i++)
+	{
+		tTemp = scene.objects[i]->Intersect(ret.incomingRay, ret.intersectionPoint, ret.intersectionNormal);
+		if (i == 0)
+		{
+			ret.t = tTemp;
+			if (tTemp != NO_INTERSECTION)
+				ret.obj = scene.objects[i];
+		}	
+		else
+		{
+			if (((ret.t > 0 and tTemp > 0) and (tTemp < ret.t)) or (ret.t == NO_INTERSECTION and tTemp > 0))
+			{
+				ret.t = tTemp;
+				ret.obj = scene.objects[i];
+			}
+		}
+	}
 
 	return ret;
 }
