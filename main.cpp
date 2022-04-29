@@ -2,6 +2,7 @@
 
 #include <iomanip>
 #include <iostream>
+#include <fstream>
 #include <string>
 #include <vector>
 
@@ -124,14 +125,17 @@ struct Triangle : public SceneObject
 		float t(glm::dot((incomingRay.origin - A), n) / f);
 		float u(glm::dot(C - A, e) / f);
 		float v(-glm::dot(B - A, e) / f);
-
-		if ((t > 0 and f > 0) or (u >= 0 and v >= 0 and u + v <= 1)) // inside the triangle
+		
+		if (u >= 0 and v >= 0 and u + v <= 1)
+		{
 			s = t;
+		}
+
 
 		if (s != NO_INTERSECTION)
 		{
 			outIntersectionPoint = incomingRay.origin + (t * incomingRay.direction);
-			outIntersectionNormal = glm::normalize(glm::cross(B - A, C - A));
+			outIntersectionNormal = glm::normalize(n);
 		}
 		return s;
 	}
@@ -233,7 +237,7 @@ Ray GetRayThruPixel(const Camera &camera, const int &pixelX, const int &pixelY)
 	Ray ray;
 	glm::vec3 cameraLookDirection(glm::normalize(camera.lookTarget - camera.position));
 
-	float viewportHeight(2 * camera.focalLength * glm::tan(camera.fovY / 2));
+	float viewportHeight(2 * camera.focalLength * glm::tan(glm::radians(camera.fovY) / 2));
 	float viewportWidth(camera.imageWidth * viewportHeight / camera.imageHeight);
 
 	glm::vec3 u(glm::normalize(glm::cross(cameraLookDirection, UP)));
@@ -317,30 +321,94 @@ glm::vec3 RayTrace(const Ray &ray, const Scene &scene, const Camera &camera, int
 int main()
 {
 	Scene scene;
+	int numOfObjects, numOfLights;
 	Camera camera;
-	int maxDepth = 1;
+	int maxDepth;
 
-	camera.position = glm::vec3(0.0f, 0.0f, 3.0f);
-	camera.lookTarget = glm::vec3(0.0f, 0.0f, 0.0f);
-	camera.globalUp = glm::vec3(0.0f, 1.0f, 0.0f);
-	camera.fovY = 45.0f;
-	camera.focalLength = 1.0f;
-	camera.imageWidth = 640;
-	camera.imageHeight = 480;
+	// camera.position = glm::vec3(0.0f, 0.0f, 3.0f);
+	// camera.lookTarget = glm::vec3(0.0f, 0.0f, 0.0f);
+	// camera.globalUp = glm::vec3(0.0f, 1.0f, 0.0f);
+	// camera.fovY = 45.0f;
+	// camera.focalLength = 1.0f;
+	// camera.imageWidth = 640;
+	// camera.imageHeight = 480;
 
-	Sphere *sphere = new Sphere();
-	sphere->center = glm::vec3(0.0f);
-	sphere->radius = 1.0f;
-	sphere->material.diffuse = glm::vec3(1, 0, 0);
+	// open .test file
+	std::ifstream sceneFile;
+	std::string filename;
+	std::cout << "Enter filename inside ./test directory: ";
+	std::cin >> filename;
+	sceneFile.open("./test/" + filename);
 
-	Triangle *triangle = new Triangle();
-	triangle->A = glm::vec3(-1.5f, -1.5f, 0.0f);
-	triangle->B = glm::vec3(0.0f, 1.5f, 0.0f);
-	triangle->C = glm::vec3(1.5f, -1.5f, 0.0f);
-	triangle->material.diffuse = glm::vec3(1, 0, 1);
+	if (!sceneFile)
+	{
+		std::cerr << "File not found.\n";
+		exit(1);
+	}
 
-	// scene.objects.push_back(sphere);
-	scene.objects.push_back(triangle);
+	// camera data
+	sceneFile >> camera.imageWidth >> camera.imageHeight;
+	sceneFile >> camera.position.x >> camera.position.y >> camera.position.z;
+	sceneFile >> camera.lookTarget.x >> camera.lookTarget.y >> camera.lookTarget.z;
+	sceneFile >> camera.globalUp.x >> camera.globalUp.y >> camera.globalUp.z;
+	sceneFile >> camera.fovY >> camera.focalLength;
+
+	sceneFile >> maxDepth >> numOfObjects;
+
+	std::string objectType;
+	Sphere *sphere;
+	Triangle *triangle;
+	Material material;
+	for (size_t i = 0; i < numOfObjects; ++i)
+	{
+		sceneFile >> objectType;
+		if (objectType == "sphere") // SPHERE
+		{
+			sphere = new Sphere();
+			sceneFile >> sphere->center.x >> sphere->center.y >> sphere->center.z >> sphere->radius;
+		}
+		else // TRIANGLE
+		{
+			triangle = new Triangle();
+			sceneFile >> triangle->A.x >> triangle->A.y >> triangle->A.z;
+			sceneFile >> triangle->B.x >> triangle->B.y >> triangle->B.z;
+			sceneFile >> triangle->C.x >> triangle->C.y >> triangle->C.z;
+		}
+
+		sceneFile >> material.ambient.r >> material.ambient.g >> material.ambient.b;
+		sceneFile >> material.diffuse.r >> material.diffuse.g >> material.diffuse.b;
+		sceneFile >> material.specular.r >> material.specular.g >> material.specular.b;
+		sceneFile >> material.shininess;
+		if (objectType == "sphere")
+		{
+			sphere->material = material;
+			scene.objects.push_back(sphere);
+		}
+		else
+		{
+			triangle->material = material;
+			scene.objects.push_back(triangle);
+		}
+	}
+
+	sceneFile >> numOfLights;
+
+	Light light;
+	for (size_t i = 0; i < numOfLights; ++i)
+	{
+		sceneFile >> light.position.x >> light.position.y >> light.position.z >> light.position.w;
+		sceneFile >> light.ambient.r >> light.ambient.g >> light.ambient.b;
+		sceneFile >> light.diffuse.r >> light.diffuse.g >> light.diffuse.b;
+		sceneFile >> light.specular.r >> light.specular.g >> light.specular.b;
+		sceneFile >> light.constant >> light.linear >> light.quadratic;
+	}
+
+	// triangle = new Triangle();
+	// triangle->A = glm::vec3(1.5f, -1.5f, 0.0f);
+	// triangle->B = glm::vec3(0.0f, 1.5f, 0.0f);
+	// triangle->C = glm::vec3(-1.5f, -1.5f, 0.0f);
+	// triangle->material.diffuse = glm::vec3(1, 0, 1);
+	// scene.objects.push_back(triangle);
 
 	// for each pixel in viewport, cast a ray and set the calculated color to the corresponding pixel
 	Image image(camera.imageWidth, camera.imageHeight);
@@ -354,7 +422,7 @@ int main()
 			image.SetColor(x, y, color);
 		}
 
-		// std::cout << "Row: " << std::setfill(' ') << std::setw(4) << (y + 1) << " / " << std::setfill(' ') << std::setw(4) << image.height << "\r" << std::flush;
+		std::cout << "Row: " << std::setfill(' ') << std::setw(4) << (y + 1) << " / " << std::setfill(' ') << std::setw(4) << image.height << "\r" << std::flush;
 	}
 	std::cout << std::endl;
 
@@ -365,6 +433,9 @@ int main()
 	{
 		delete scene.objects[i];
 	}
+
+	// DEBUG only
+	// system("pause");
 
 	return 0;
 }
