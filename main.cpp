@@ -323,6 +323,8 @@ glm::vec3 RayTrace(const Ray &ray, const Scene &scene, const Camera &camera, int
 	Ray shadowRay;
 	IntersectionInfo shadowingInfo;
 
+	Ray reflectionRay;
+
 	IntersectionInfo intersectionInfo = Raycast(ray, scene);
 	if (intersectionInfo.obj != nullptr)
 	{
@@ -358,13 +360,18 @@ glm::vec3 RayTrace(const Ray &ray, const Scene &scene, const Camera &camera, int
 			shadowingInfo = Raycast(shadowRay, scene);
 
 			color = ambient;
-			// color = ambient + ((diffuse + specular) * attenuation);
 
 			// Lit when (.obj is null) or (.obj is not null but distance to intersectionPoint is greater than distance to light)
 			if ((shadowingInfo.obj == nullptr) or ((shadowingInfo.obj != nullptr) and (glm::distance(shadowRay.origin, shadowingInfo.intersectionPoint) > glm::distance(shadowRay.origin, glm::vec3(scene.lights[i].position)))))
 			{
 				color = ambient + ((diffuse + specular) * attenuation);
 			}
+
+			// REFLECTION
+			reflectionRay.origin = intersectionInfo.intersectionPoint;
+			reflectionRay.direction = glm::reflect(intersectionInfo.incomingRay.direction, intersectionInfo.intersectionNormal);
+
+			color += RayTrace(reflectionRay, scene, camera, maxDepth - 1) * intersectionInfo.obj->material.shininess / 128.0f;
 		}
 	}
 
@@ -460,13 +467,6 @@ int main()
 		sceneFile >> light->constant >> light->linear >> light->quadratic;
 		scene.lights.push_back(*light);
 	}
-
-	// triangle = new Triangle();
-	// triangle->A = glm::vec3(1.5f, -1.5f, 0.0f);
-	// triangle->B = glm::vec3(0.0f, 1.5f, 0.0f);
-	// triangle->C = glm::vec3(-1.5f, -1.5f, 0.0f);
-	// triangle->material.diffuse = glm::vec3(1, 0, 1);
-	// scene.objects.push_back(triangle);
 
 	// for each pixel in viewport, cast a ray and set the calculated color to the corresponding pixel
 	Image image(camera.imageWidth, camera.imageHeight);
