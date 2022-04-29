@@ -102,7 +102,7 @@ struct Sphere : public SceneObject
 		if(s != NO_INTERSECTION)
 		{
 			outIntersectionPoint = incomingRay.origin + (s * incomingRay.direction);
-			outIntersectionNormal = glm::normalize(outIntersectionPoint - this->center);
+			outIntersectionNormal = glm::normalize(outIntersectionPoint - center);
 		}
 		return s;
 	}
@@ -228,16 +228,16 @@ Ray GetRayThruPixel(const Camera& camera, const int& pixelX, const int& pixelY)
 	Ray ray;
 	glm::vec3 cameraLookDirection(glm::normalize(camera.lookTarget - camera.position));
 
-	float viewportHeight = 2 * camera.focalLength * glm::tan(camera.fovY / 2);
-	float viewportWidth = (camera.imageWidth / camera.imageHeight) * viewportHeight;
+	float viewportHeight(2 * camera.focalLength * glm::tan(camera.fovY / 2));
+	float viewportWidth(camera.imageWidth * viewportHeight / camera.imageHeight);
 
 	glm::vec3 u(glm::normalize(glm::cross(cameraLookDirection, UP)));
 	glm::vec3 v(glm::normalize(glm::cross(u, cameraLookDirection)));
 
 	glm::vec3 viewportLowerLeft(camera.position + (cameraLookDirection * camera.focalLength) - (u * (viewportWidth / 2)) - (v * (viewportHeight / 2)));
 
-	float pixelXOffset = 0.5f; // the part of the pixel that the ray passes through
-	float pixelYOffset = 0.5f;
+	float pixelXOffset(0.5f); // the part of the pixel that the ray passes through
+	float pixelYOffset(0.5f);
 	float s((pixelX + pixelXOffset) * viewportWidth / camera.imageWidth);
 	float t((pixelY + pixelYOffset) * viewportHeight / camera.imageHeight);
 
@@ -271,8 +271,7 @@ IntersectionInfo Raycast(const Ray& ray, const Scene& scene)
 		{
 			ret.t = tTemp;
 			ret.obj = (tTemp == NO_INTERSECTION) ? nullptr : scene.objects[i];
-		}
-		else
+		} else
 		{
 			if((tTemp > 0 and ret.t > 0 and tTemp < ret.t) or (ret.t == NO_INTERSECTION and tTemp > 0))
 			{
