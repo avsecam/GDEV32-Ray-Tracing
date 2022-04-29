@@ -9,9 +9,8 @@
 #include "stb_image_write.h"
 
 const int NO_INTERSECTION(-1.0f);
-const glm::vec3 BACKGROUND_COLOR(0.0f, 0.5f, 0.5f);
+glm::vec3 BACKGROUND_COLOR(0.0f, 0.5f, 0.5f);
 const glm::vec3 UP(0.0f, 1.0f, 0.0f);
-
 
 struct Ray
 {
@@ -38,7 +37,7 @@ struct SceneObject
 	 * @param[out]  outIntersectionNormal   Normal vector at the point of intersection (in case there is an intersection)
 	 * @return If there is an intersection, returns the distance from the ray origin to the intersection point. Otherwise, returns a negative number.
 	 */
-	virtual float Intersect(const Ray& incomingRay, glm::vec3& outIntersectionPoint, glm::vec3& outIntersectionNormal) = 0;
+	virtual float Intersect(const Ray &incomingRay, glm::vec3 &outIntersectionPoint, glm::vec3 &outIntersectionNormal) = 0;
 };
 
 // Subclass of SceneObject representing a Sphere scene object
@@ -54,9 +53,9 @@ struct Sphere : public SceneObject
 	 * @param[out]  outIntersectionNormal   Normal vector at the point of intersection (in case there is an intersection)
 	 * @return If there is an intersection, returns the distance from the ray origin to the intersection point. Otherwise, returns a negative number.
 	 */
-	virtual float Intersect(const Ray& incomingRay, glm::vec3& outIntersectionPoint, glm::vec3& outIntersectionNormal)
+	virtual float Intersect(const Ray &incomingRay, glm::vec3 &outIntersectionPoint, glm::vec3 &outIntersectionNormal)
 	{
-		float s;
+		float s(NO_INTERSECTION);
 
 		// In case there is an intersection, place the intersection point and intersection normal
 		// that you calculated to the outIntersectionPoint and outIntersectionNormal variables.
@@ -77,29 +76,21 @@ struct Sphere : public SceneObject
 		float discriminant((b * b) - c);
 		float t1, t2;
 
-		// The ray does not intersect with the sphere.
-		if(discriminant < 0)
-			s = NO_INTERSECTION;
-
 		// The ray intersects with the sphere once.
-		else if(discriminant == 0)
+		if (discriminant == 0)
 			s = -b;
 
-		else
+		else if (discriminant > 0)
 		{
 			t1 = -b + glm::sqrt(discriminant);
 			t2 = -b - glm::sqrt(discriminant);
 
-			// The ray starts outside the sphere and moves away from it.
-			if(t1 < 0 and t2 < 0)
-				s = NO_INTERSECTION;
-
 			// The ray starts outside or inside the sphere and intersects it once or twice. Get the smaller and positive root.
-			else
+			if (!(t1 < 0 and t2 < 0))
 				s = (t1 > 0 and t1 < t2) ? t1 : t2;
 		}
 
-		if(s != NO_INTERSECTION)
+		if (s != NO_INTERSECTION)
 		{
 			outIntersectionPoint = incomingRay.origin + (s * incomingRay.direction);
 			outIntersectionNormal = glm::normalize(outIntersectionPoint - center);
@@ -122,12 +113,26 @@ struct Triangle : public SceneObject
 	 * @param[out]  outIntersectionNormal   Normal vector at the point of intersection (in case there is an intersection)
 	 * @return If there is an intersection, returns the distance from the ray origin to the intersection point. Otherwise, returns a negative number.
 	 */
-	virtual float Intersect(const Ray& incomingRay, glm::vec3& outIntersectionPoint, glm::vec3& outIntersectionNormal)
+	virtual float Intersect(const Ray &incomingRay, glm::vec3 &outIntersectionPoint, glm::vec3 &outIntersectionNormal)
 	{
-		float s = 0.0f;
+		float s(NO_INTERSECTION);
 
-		// The same idea for the outIntersectionPoint and outIntersectionNormal applies here
+		glm::vec3 n(glm::cross(B - A, C - A));
+		glm::vec3 e(glm::cross(-incomingRay.direction, incomingRay.origin - A));
+		float f(glm::dot(-incomingRay.direction, n));
 
+		float t(glm::dot((incomingRay.origin - A), n) / f);
+		float u(glm::dot(C - A, e) / f);
+		float v(-glm::dot(B - A, e) / f);
+
+		if ((t > 0 and f > 0) or (u >= 0 and v >= 0 and u + v <= 1)) // inside the triangle
+			s = t;
+
+		if (s != NO_INTERSECTION)
+		{
+			outIntersectionPoint = incomingRay.origin + (t * incomingRay.direction);
+			outIntersectionNormal = glm::normalize(glm::cross(B - A, C - A));
+		}
 		return s;
 	}
 };
@@ -162,14 +167,14 @@ struct IntersectionInfo
 {
 	Ray incomingRay;							// Ray used to calculate the intersection
 	float t;											// Distance from the ray's origin to the point of intersection (if there was an intersection).
-	SceneObject* obj;							// Object that the ray intersected with. If this is equal to nullptr, then no intersection occured.
+	SceneObject *obj;							// Object that the ray intersected with. If this is equal to nullptr, then no intersection occured.
 	glm::vec3 intersectionPoint;	// Point where the intersection occured (if there was an intersection)
 	glm::vec3 intersectionNormal; // Normal vector at the point of intersection (if there was an intersection)
 };
 
 struct Scene
 {
-	std::vector<SceneObject*> objects; // List of all objects in the scene
+	std::vector<SceneObject *> objects; // List of all objects in the scene
 	std::vector<Light> lights;					// List of all lights in the scene
 };
 
@@ -184,8 +189,8 @@ struct Image
 	 * @param[in] w Width
 	 * @param[in] h Height
 	 */
-	Image(const int& w, const int& h)
-		: width(w), height(h)
+	Image(const int &w, const int &h)
+			: width(w), height(h)
 	{
 		data.resize(w * h * 3, 0);
 	}
@@ -207,7 +212,7 @@ struct Image
 	 * @param[in] y     Y-coordinate of the pixel
 	 * @param[in] color Pixel color
 	 */
-	void SetColor(const int& x, const int& y, const glm::vec3& color)
+	void SetColor(const int &x, const int &y, const glm::vec3 &color)
 	{
 		int index = (y * width + x) * 3;
 		data[index] = ToChar(color.r);
@@ -223,7 +228,7 @@ struct Image
  * @param[in] y Y-coordinate of the pixel (upper-left corner of the pixel)
  * @return Ray that passes through the pixel at (x, y)
  */
-Ray GetRayThruPixel(const Camera& camera, const int& pixelX, const int& pixelY)
+Ray GetRayThruPixel(const Camera &camera, const int &pixelX, const int &pixelY)
 {
 	Ray ray;
 	glm::vec3 cameraLookDirection(glm::normalize(camera.lookTarget - camera.position));
@@ -255,7 +260,7 @@ Ray GetRayThruPixel(const Camera& camera, const int& pixelX, const int& pixelY)
  * @param[in] scene Scene object
  * @return Returns an IntersectionInfo object that will contain the results of the raycast
  */
-IntersectionInfo Raycast(const Ray& ray, const Scene& scene)
+IntersectionInfo Raycast(const Ray &ray, const Scene &scene)
 {
 	IntersectionInfo ret;
 	float tTemp;
@@ -263,17 +268,18 @@ IntersectionInfo Raycast(const Ray& ray, const Scene& scene)
 
 	// Go through all objects in the scene.
 	// If the object is closer to the ray origin than the last object, overwrite the value of ret.t.
-	for(size_t i = 0; i < scene.objects.size(); ++i)
+	for (size_t i = 0; i < scene.objects.size(); ++i)
 	{
 		tTemp = scene.objects[i]->Intersect(ray, ret.intersectionPoint, ret.intersectionNormal);
 
-		if(i == 0)
+		if (i == 0)
 		{
 			ret.t = tTemp;
 			ret.obj = (tTemp == NO_INTERSECTION) ? nullptr : scene.objects[i];
-		} else
+		}
+		else
 		{
-			if((tTemp > 0 and ret.t > 0 and tTemp < ret.t) or (ret.t == NO_INTERSECTION and tTemp > 0))
+			if ((tTemp > 0 and ret.t > 0 and tTemp < ret.t) or (ret.t == NO_INTERSECTION and tTemp > 0))
 			{
 				ret.t = tTemp;
 				ret.obj = scene.objects[i];
@@ -292,12 +298,12 @@ IntersectionInfo Raycast(const Ray& ray, const Scene& scene)
  * @param[in] maxDepth  Maximum depth of the trace
  * @return Resulting color after the ray bounced around the scene
  */
-glm::vec3 RayTrace(const Ray& ray, const Scene& scene, const Camera& camera, int maxDepth = 1)
+glm::vec3 RayTrace(const Ray &ray, const Scene &scene, const Camera &camera, int maxDepth = 1)
 {
 	glm::vec3 color = BACKGROUND_COLOR;
 
 	IntersectionInfo intersectionInfo = Raycast(ray, scene);
-	if(intersectionInfo.obj != nullptr)
+	if (intersectionInfo.obj != nullptr)
 	{
 		color = intersectionInfo.obj->material.diffuse;
 	}
@@ -322,18 +328,25 @@ int main()
 	camera.imageWidth = 640;
 	camera.imageHeight = 480;
 
-	Sphere* sphere = new Sphere();
+	Sphere *sphere = new Sphere();
 	sphere->center = glm::vec3(0.0f);
 	sphere->radius = 1.0f;
 	sphere->material.diffuse = glm::vec3(1, 0, 0);
 
-	scene.objects.push_back(sphere);
+	Triangle *triangle = new Triangle();
+	triangle->A = glm::vec3(-1.5f, -1.5f, 0.0f);
+	triangle->B = glm::vec3(0.0f, 1.5f, 0.0f);
+	triangle->C = glm::vec3(1.5f, -1.5f, 0.0f);
+	triangle->material.diffuse = glm::vec3(1, 0, 1);
+
+	// scene.objects.push_back(sphere);
+	scene.objects.push_back(triangle);
 
 	// for each pixel in viewport, cast a ray and set the calculated color to the corresponding pixel
 	Image image(camera.imageWidth, camera.imageHeight);
-	for(int y = 0; y < image.height; ++y)
+	for (int y = 0; y < image.height; ++y)
 	{
-		for(int x = 0; x < image.width; ++x)
+		for (int x = 0; x < image.width; ++x)
 		{
 			Ray ray = GetRayThruPixel(camera, x, image.height - y - 1);
 
@@ -341,14 +354,14 @@ int main()
 			image.SetColor(x, y, color);
 		}
 
-		//std::cout << "Row: " << std::setfill(' ') << std::setw(4) << (y + 1) << " / " << std::setfill(' ') << std::setw(4) << image.height << "\r" << std::flush;
+		// std::cout << "Row: " << std::setfill(' ') << std::setw(4) << (y + 1) << " / " << std::setfill(' ') << std::setw(4) << image.height << "\r" << std::flush;
 	}
 	std::cout << std::endl;
 
 	std::string imageFileName = "scene.png"; // You might need to make this a full path if you are on Mac
 	stbi_write_png(imageFileName.c_str(), image.width, image.height, 3, image.data.data(), 0);
 
-	for(size_t i = 0; i < scene.objects.size(); ++i)
+	for (size_t i = 0; i < scene.objects.size(); ++i)
 	{
 		delete scene.objects[i];
 	}
