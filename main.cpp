@@ -9,6 +9,8 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
 
+enum LightType {DIRECTIONAL_LIGHT, POINT_LIGHT};
+
 const int NO_INTERSECTION(-1.0f);
 glm::vec3 BACKGROUND_COLOR(0.0f, 0.5f, 0.5f);
 const glm::vec3 UP(0.0f, 1.0f, 0.0f);
@@ -304,12 +306,29 @@ IntersectionInfo Raycast(const Ray &ray, const Scene &scene)
  */
 glm::vec3 RayTrace(const Ray &ray, const Scene &scene, const Camera &camera, int maxDepth = 1)
 {
-	glm::vec3 color = BACKGROUND_COLOR;
+	glm::vec3 color(BACKGROUND_COLOR);
+
+	glm::vec3 ambient, diffuse, specular;
+	glm::vec3 directionToLight;
+	float diffuseStrength;
 
 	IntersectionInfo intersectionInfo = Raycast(ray, scene);
 	if (intersectionInfo.obj != nullptr)
 	{
-		color = intersectionInfo.obj->material.diffuse;
+		for (size_t i = 0; i < scene.lights.size(); ++i)
+		{
+			// AMBIENT
+			ambient = intersectionInfo.obj->material.ambient * scene.lights[i].ambient;
+
+			// DIFFUSE
+			directionToLight = (scene.lights[i].position.w == POINT_LIGHT)
+				? glm::normalize(glm::vec3(scene.lights[i].position) - intersectionInfo.intersectionPoint)
+				: glm::normalize(glm::vec3(-scene.lights[i].position));
+			diffuseStrength = glm::max(glm::dot(directionToLight, intersectionInfo.intersectionNormal), 0.0f);
+			diffuse = diffuseStrength * (intersectionInfo.obj->material.diffuse * scene.lights[i].diffuse);
+
+			color = ambient + diffuse;
+		}
 	}
 
 	return color;
@@ -393,14 +412,16 @@ int main()
 
 	sceneFile >> numOfLights;
 
-	Light light;
+	Light *light;
 	for (size_t i = 0; i < numOfLights; ++i)
 	{
-		sceneFile >> light.position.x >> light.position.y >> light.position.z >> light.position.w;
-		sceneFile >> light.ambient.r >> light.ambient.g >> light.ambient.b;
-		sceneFile >> light.diffuse.r >> light.diffuse.g >> light.diffuse.b;
-		sceneFile >> light.specular.r >> light.specular.g >> light.specular.b;
-		sceneFile >> light.constant >> light.linear >> light.quadratic;
+		light = new Light();
+		sceneFile >> light->position.x >> light->position.y >> light->position.z >> light->position.w;
+		sceneFile >> light->ambient.r >> light->ambient.g >> light->ambient.b;
+		sceneFile >> light->diffuse.r >> light->diffuse.g >> light->diffuse.b;
+		sceneFile >> light->specular.r >> light->specular.g >> light->specular.b;
+		sceneFile >> light->constant >> light->linear >> light->quadratic;
+		scene.lights.push_back(*light);
 	}
 
 	// triangle = new Triangle();
