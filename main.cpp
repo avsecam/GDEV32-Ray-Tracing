@@ -9,11 +9,16 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
 
-enum LightType {DIRECTIONAL_LIGHT, POINT_LIGHT};
+enum LightType
+{
+	DIRECTIONAL_LIGHT,
+	POINT_LIGHT
+};
 
 const int NO_INTERSECTION(-1.0f);
 glm::vec3 BACKGROUND_COLOR(0.0f, 0.5f, 0.5f);
 const glm::vec3 UP(0.0f, 1.0f, 0.0f);
+const float SHADOW_BIAS(0.001f);
 
 struct Ray
 {
@@ -127,12 +132,11 @@ struct Triangle : public SceneObject
 		float t(glm::dot((incomingRay.origin - A), n) / f);
 		float u(glm::dot(C - A, e) / f);
 		float v(-glm::dot(B - A, e) / f);
-		
-		if (u >= 0 and v >= 0 and u + v <= 1)
+
+		if (f > 0 and t > 0 and u >= 0 and v >= 0 and u + v <= 1)
 		{
 			s = t;
 		}
-
 
 		if (s != NO_INTERSECTION)
 		{
@@ -310,7 +314,14 @@ glm::vec3 RayTrace(const Ray &ray, const Scene &scene, const Camera &camera, int
 
 	glm::vec3 ambient, diffuse, specular;
 	glm::vec3 directionToLight;
+	float distanceToLight;
 	float diffuseStrength;
+	glm::vec3 reflectedLight;
+	float specularStrength;
+	float attenuation;
+
+	Ray shadowRay;
+	IntersectionInfo shadowingInfo;
 
 	IntersectionInfo intersectionInfo = Raycast(ray, scene);
 	if (intersectionInfo.obj != nullptr)
@@ -322,12 +333,38 @@ glm::vec3 RayTrace(const Ray &ray, const Scene &scene, const Camera &camera, int
 
 			// DIFFUSE
 			directionToLight = (scene.lights[i].position.w == POINT_LIGHT)
-				? glm::normalize(glm::vec3(scene.lights[i].position) - intersectionInfo.intersectionPoint)
-				: glm::normalize(glm::vec3(-scene.lights[i].position));
+														 ? glm::normalize(glm::vec3(scene.lights[i].position) - intersectionInfo.intersectionPoint)
+														 : glm::normalize(glm::vec3(-scene.lights[i].position));
 			diffuseStrength = glm::max(glm::dot(directionToLight, intersectionInfo.intersectionNormal), 0.0f);
-			diffuse = diffuseStrength * (intersectionInfo.obj->material.diffuse * scene.lights[i].diffuse);
+			diffuse = diffuseStrength * intersectionInfo.obj->material.diffuse * scene.lights[i].diffuse;
 
-			color = ambient + diffuse;
+			// SPECULAR
+			reflectedLight = glm::reflect(-directionToLight, intersectionInfo.intersectionNormal);
+			specularStrength = glm::pow(glm::max(glm::dot(reflectedLight, -ray.direction), 0.0f), intersectionInfo.obj->material.shininess);
+			specular = specularStrength * intersectionInfo.obj->material.specular * scene.lights[i].specular;
+
+			// ATTENUATION
+			attenuation = 1.0f;
+
+			if (scene.lights[i].position.w != DIRECTIONAL_LIGHT)
+			{
+				distanceToLight = glm::distance(intersectionInfo.intersectionPoint, glm::vec3(scene.lights[i].position));
+				attenuation = 1.0f / (scene.lights[i].constant + (scene.lights[i].linear * distanceToLight) + (scene.lights[i].quadratic * distanceToLight * distanceToLight));
+			}
+
+			// SHADOWING
+			shadowRay.origin = intersectionInfo.intersectionPoint + SHADOW_BIAS;
+			shadowRay.direction = directionToLight;
+			shadowingInfo = Raycast(shadowRay, scene);
+
+			color = ambient;
+			// color = ambient + ((diffuse + specular) * attenuation);
+
+			// Lit when (.obj is null) or (.obj is not null but distance to intersectionPoint is greater than distance to light)
+			if ((shadowingInfo.obj == nullptr) or ((shadowingInfo.obj != nullptr) and (glm::distance(shadowRay.origin, shadowingInfo.intersectionPoint) > glm::distance(shadowRay.origin, glm::vec3(scene.lights[i].position)))))
+			{
+				color = ambient + ((diffuse + specular) * attenuation);
+			}
 		}
 	}
 
