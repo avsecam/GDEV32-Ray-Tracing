@@ -67,18 +67,6 @@ struct Sphere : public SceneObject
 	{
 		float s(NO_INTERSECTION);
 
-		// In case there is an intersection, place the intersection point and intersection normal
-		// that you calculated to the outIntersectionPoint and outIntersectionNormal variables.
-		//
-		// When you use this function from the outside, you can pass in the variables by reference.
-		//
-		// Example:
-		// Ray ray = ...;
-		// glm::vec3 point, normal;
-		// float t = sphere->Intersect(ray, point, normal);
-		//
-		// (At this point, point and normal will now contain the intersection point and intersection normal)
-
 		// m = P - C
 		glm::vec3 m(incomingRay.origin - center);
 		float b(glm::dot(m, incomingRay.direction));
@@ -246,9 +234,11 @@ Ray GetRayThruPixel(const Camera &camera, const int &pixelX, const int &pixelY, 
 	Ray ray;
 	glm::vec3 cameraLookDirection(glm::normalize(camera.lookTarget - camera.position));
 
+	// VIEWPORT SIZING
 	float viewportHeight(2 * camera.focalLength * glm::tan(glm::radians(camera.fovY) / 2));
 	float viewportWidth(camera.imageWidth * viewportHeight / camera.imageHeight);
 
+	// UV directions of the camera
 	glm::vec3 u(glm::normalize(glm::cross(cameraLookDirection, camera.globalUp)));
 	glm::vec3 v(glm::normalize(glm::cross(u, cameraLookDirection)));
 
@@ -262,9 +252,9 @@ Ray GetRayThruPixel(const Camera &camera, const int &pixelX, const int &pixelY, 
 		pixelYOffset = static_cast<float>(rand()) / static_cast<float>(RAND_MAX);
 	}
 
+	// position of pixel in viewport
 	float s((pixelX + pixelXOffset) * viewportWidth / camera.imageWidth);
 	float t((pixelY + pixelYOffset) * viewportHeight / camera.imageHeight);
-
 	glm::vec3 pixelPosition(viewportLowerLeft + (u * s) + (v * t));
 
 	ray.origin = camera.position;
@@ -282,30 +272,48 @@ Ray GetRayThruPixel(const Camera &camera, const int &pixelX, const int &pixelY, 
 IntersectionInfo Raycast(const Ray &ray, const Scene &scene)
 {
 	IntersectionInfo ret;
-	float tTemp;
+	IntersectionInfo infoTemp;
 	ret.incomingRay = ray;
+	infoTemp.incomingRay = ray;
+	infoTemp.intersectionPoint = glm::vec3();
+	infoTemp.intersectionNormal = glm::vec3();
 
 	// Go through all objects in the scene.
-	// If the object is closer to the ray origin than the last object, overwrite the value of ret.t.
+	// If the object is closer to the ray origin than the last object, overwrite the contents of ret.
 	for (size_t i = 0; i < scene.objects.size(); ++i)
 	{
-		tTemp = scene.objects[i]->Intersect(ret.incomingRay, ret.intersectionPoint, ret.intersectionNormal);
+		infoTemp.t = scene.objects[i]->Intersect(infoTemp.incomingRay, infoTemp.intersectionPoint, infoTemp.intersectionNormal);
 
+		// Set ret.t on first iteration
+		// Only set obj, point, and normal if infoTemp.t is an intersection
 		if (i == 0)
 		{
-			ret.t = tTemp;
-			ret.obj = (tTemp == NO_INTERSECTION) ? nullptr : scene.objects[i];
+			ret.t = infoTemp.t;
+			if (infoTemp.t != NO_INTERSECTION)
+			{
+				ret.obj = scene.objects[i];
+				ret.intersectionPoint = infoTemp.intersectionPoint;
+				ret.intersectionNormal = infoTemp.intersectionNormal;
+			}
+			else
+			{
+				ret.obj = nullptr;
+			}
 		}
+		// On succeeding iterations, only overwrite ret if:
+		// both infoTemp and ret's t values are positive, and infoTemp.t is less than ret.t, OR
+		// ret.t has no intersection while infoTemp.t has
 		else
 		{
-			if ((tTemp > 0 and ret.t > 0 and tTemp < ret.t) or (ret.t == NO_INTERSECTION and tTemp > 0))
+			if ((infoTemp.t > 0 and ret.t > 0 and infoTemp.t < ret.t) or (ret.t == NO_INTERSECTION and infoTemp.t > 0))
 			{
-				ret.t = tTemp;
+				ret.t = infoTemp.t;
 				ret.obj = scene.objects[i];
+				ret.intersectionPoint = infoTemp.intersectionPoint;
+				ret.intersectionNormal = infoTemp.intersectionNormal;
 			}
 		}
 	}
-
 	return ret;
 }
 
@@ -364,7 +372,7 @@ glm::vec3 RayTrace(const Ray &ray, const Scene &scene, const Camera &camera, int
 			}
 
 			// SHADOWING
-			shadowRay.origin = intersectionInfo.intersectionPoint + SHADOW_BIAS;
+			shadowRay.origin = intersectionInfo.intersectionPoint + (intersectionInfo.intersectionNormal * SHADOW_BIAS);
 			shadowRay.direction = directionToLight;
 			shadowingInfo = Raycast(shadowRay, scene);
 
@@ -486,6 +494,7 @@ int main()
 	{
 		for (int x = 0; x < image.width; ++x)
 		{
+			// ANTI-ALIASING
 			if (antiAliasing)
 			{
 				glm::vec3 colorSum;
