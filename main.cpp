@@ -20,6 +20,7 @@ const glm::vec3 BACKGROUND_COLOR(0.0f, 0.5f, 0.0f);
 const glm::vec3 UP(0.0f, 1.0f, 0.0f);
 const float SHADOW_BIAS(0.001f);
 const float REFLECTION_BIAS(0.001f);
+const int SAMPLES_PER_PIXEL(5);
 
 struct Ray
 {
@@ -237,9 +238,10 @@ struct Image
  * @param[in] camera Camera data
  * @param[in] x X-coordinate of the pixel (upper-left corner of the pixel)
  * @param[in] y Y-coordinate of the pixel (upper-left corner of the pixel)
+ * @param[in] aa anti-aliasing
  * @return Ray that passes through the pixel at (x, y)
  */
-Ray GetRayThruPixel(const Camera &camera, const int &pixelX, const int &pixelY)
+Ray GetRayThruPixel(const Camera &camera, const int &pixelX, const int &pixelY, const bool aa = false)
 {
 	Ray ray;
 	glm::vec3 cameraLookDirection(glm::normalize(camera.lookTarget - camera.position));
@@ -254,6 +256,12 @@ Ray GetRayThruPixel(const Camera &camera, const int &pixelX, const int &pixelY)
 
 	float pixelXOffset(0.5f); // the part of the pixel that the ray passes through
 	float pixelYOffset(0.5f);
+	if (aa)
+	{
+		pixelXOffset = static_cast<float>(rand()) / static_cast<float>(RAND_MAX); // the part of the pixel that the ray passes through
+		pixelYOffset = static_cast<float>(rand()) / static_cast<float>(RAND_MAX);
+	}
+
 	float s((pixelX + pixelXOffset) * viewportWidth / camera.imageWidth);
 	float t((pixelY + pixelYOffset) * viewportHeight / camera.imageHeight);
 
@@ -313,8 +321,6 @@ glm::vec3 RayTrace(const Ray &ray, const Scene &scene, const Camera &camera, int
 {
 	glm::vec3 color(BACKGROUND_COLOR);
 
-	if (maxDepth < 1) return glm::vec3();
-
 	glm::vec3 ambient, diffuse, specular;
 	glm::vec3 directionToLight;
 	float distanceToLight;
@@ -371,10 +377,13 @@ glm::vec3 RayTrace(const Ray &ray, const Scene &scene, const Camera &camera, int
 			}
 
 			// REFLECTION
-			reflectionRay.origin = intersectionInfo.intersectionPoint + (intersectionInfo.intersectionNormal * REFLECTION_BIAS);
-			reflectionRay.direction = glm::reflect(intersectionInfo.incomingRay.direction, intersectionInfo.intersectionNormal);
+			if (maxDepth > 1)
+			{
+				reflectionRay.origin = intersectionInfo.intersectionPoint + (intersectionInfo.intersectionNormal * REFLECTION_BIAS);
+				reflectionRay.direction = glm::reflect(intersectionInfo.incomingRay.direction, intersectionInfo.intersectionNormal);
 
-			color += RayTrace(reflectionRay, scene, camera, maxDepth - 1) * intersectionInfo.obj->material.shininess / 128.0f;
+				color += RayTrace(reflectionRay, scene, camera, maxDepth - 1) * intersectionInfo.obj->material.shininess / 128.0f;
+			}
 		}
 	}
 
@@ -386,6 +395,9 @@ glm::vec3 RayTrace(const Ray &ray, const Scene &scene, const Camera &camera, int
  */
 int main()
 {
+	char antiAliasingChoice;
+	bool antiAliasing(false);
+
 	Scene scene;
 	int numOfObjects, numOfLights;
 	Camera camera;
@@ -463,16 +475,34 @@ int main()
 		scene.lights.push_back(*light);
 	}
 
+	std::cout << "Enable anti-aliasing? (Y/N) ";
+	std::cin >> antiAliasingChoice;
+	if (tolower(antiAliasingChoice) == 'y')
+		antiAliasing = true;
+
 	// for each pixel in viewport, cast a ray and set the calculated color to the corresponding pixel
 	Image image(camera.imageWidth, camera.imageHeight);
 	for (int y = 0; y < image.height; ++y)
 	{
 		for (int x = 0; x < image.width; ++x)
 		{
-			Ray ray = GetRayThruPixel(camera, x, image.height - y - 1);
-
-			glm::vec3 color = RayTrace(ray, scene, camera, maxDepth);
-			image.SetColor(x, y, color);
+			if (antiAliasing)
+			{
+				glm::vec3 colorSum;
+				for (int i = 0; i < SAMPLES_PER_PIXEL; ++i)
+				{
+					Ray ray = GetRayThruPixel(camera, x, image.height - y - 1, antiAliasing);
+					colorSum += RayTrace(ray, scene, camera, maxDepth);
+				}
+				colorSum /= SAMPLES_PER_PIXEL;
+				image.SetColor(x, y, colorSum);
+			}
+			else
+			{
+				Ray ray(GetRayThruPixel(camera, x, image.height - y - 1));
+				glm::vec3 color(RayTrace(ray, scene, camera, maxDepth));
+				image.SetColor(x, y, color);
+			}
 		}
 
 		std::cout << "Row: " << std::setfill(' ') << std::setw(4) << (y + 1) << " / " << std::setfill(' ') << std::setw(4) << image.height << "\r" << std::flush;
