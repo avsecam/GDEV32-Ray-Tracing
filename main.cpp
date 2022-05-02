@@ -95,7 +95,7 @@ struct Sphere : public SceneObject
 			t2 = -b - glm::sqrt(discriminant);
 
 			// The ray starts outside or inside the sphere and intersects it once or twice. Get the smaller and positive root.
-			if (!(t1 < 0 and t2 < 0))
+			if (t1 > 0 or t2 > 0)
 				s = (t1 > 0 and t1 < t2) ? t1 : t2;
 		}
 
@@ -281,7 +281,7 @@ IntersectionInfo Raycast(const Ray &ray, const Scene &scene)
 	// If the object is closer to the ray origin than the last object, overwrite the value of ret.t.
 	for (size_t i = 0; i < scene.objects.size(); ++i)
 	{
-		tTemp = scene.objects[i]->Intersect(ray, ret.intersectionPoint, ret.intersectionNormal);
+		tTemp = scene.objects[i]->Intersect(ret.incomingRay, ret.intersectionPoint, ret.intersectionNormal);
 
 		if (i == 0)
 		{
@@ -312,6 +312,8 @@ IntersectionInfo Raycast(const Ray &ray, const Scene &scene)
 glm::vec3 RayTrace(const Ray &ray, const Scene &scene, const Camera &camera, int maxDepth = 1)
 {
 	glm::vec3 color(BACKGROUND_COLOR);
+
+	if (maxDepth < 1) return glm::vec3();
 
 	glm::vec3 ambient, diffuse, specular;
 	glm::vec3 directionToLight;
@@ -369,7 +371,7 @@ glm::vec3 RayTrace(const Ray &ray, const Scene &scene, const Camera &camera, int
 			}
 
 			// REFLECTION
-			reflectionRay.origin = intersectionInfo.intersectionPoint + REFLECTION_BIAS;
+			reflectionRay.origin = intersectionInfo.intersectionPoint + (intersectionInfo.intersectionNormal * REFLECTION_BIAS);
 			reflectionRay.direction = glm::reflect(intersectionInfo.incomingRay.direction, intersectionInfo.intersectionNormal);
 
 			color += RayTrace(reflectionRay, scene, camera, maxDepth - 1) * intersectionInfo.obj->material.shininess / 128.0f;
