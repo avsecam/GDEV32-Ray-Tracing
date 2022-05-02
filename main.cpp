@@ -16,7 +16,7 @@ enum LightType
 };
 
 const int NO_INTERSECTION(-1.0f);
-const glm::vec3 BACKGROUND_COLOR(0.0f, 0.5f, 0.5f);
+const glm::vec3 BACKGROUND_COLOR(0.0f, 0.5f, 0.0f);
 const glm::vec3 UP(0.0f, 1.0f, 0.0f);
 const float SHADOW_BIAS(0.001f);
 const float REFLECTION_BIAS(0.001f);
@@ -247,7 +247,7 @@ Ray GetRayThruPixel(const Camera &camera, const int &pixelX, const int &pixelY)
 	float viewportHeight(2 * camera.focalLength * glm::tan(glm::radians(camera.fovY) / 2));
 	float viewportWidth(camera.imageWidth * viewportHeight / camera.imageHeight);
 
-	glm::vec3 u(glm::normalize(glm::cross(cameraLookDirection, UP)));
+	glm::vec3 u(glm::normalize(glm::cross(cameraLookDirection, camera.globalUp)));
 	glm::vec3 v(glm::normalize(glm::cross(u, cameraLookDirection)));
 
 	glm::vec3 viewportLowerLeft(camera.position + (cameraLookDirection * camera.focalLength) - (u * (viewportWidth / 2)) - (v * (viewportHeight / 2)));
@@ -388,14 +388,6 @@ int main()
 	int numOfObjects, numOfLights;
 	Camera camera;
 	int maxDepth;
-
-	// camera.position = glm::vec3(0.0f, 0.0f, 3.0f);
-	// camera.lookTarget = glm::vec3(0.0f, 0.0f, 0.0f);
-	// camera.globalUp = glm::vec3(0.0f, 1.0f, 0.0f);
-	// camera.fovY = 45.0f;
-	// camera.focalLength = 1.0f;
-	// camera.imageWidth = 640;
-	// camera.imageHeight = 480;
 
 	// open .test file
 	std::ifstream sceneFile;
