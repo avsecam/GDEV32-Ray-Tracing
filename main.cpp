@@ -16,7 +16,7 @@ enum LightType
 };
 
 const int NO_INTERSECTION(-1.0f);
-const glm::vec3 BACKGROUND_COLOR(0.0f, 0.5f, 0.0f);
+const glm::vec3 BACKGROUND_COLOR(0.0f, 0.0f, 0.0f);
 const glm::vec3 UP(0.0f, 1.0f, 0.0f);
 const float SHADOW_BIAS(0.001f);
 const float REFLECTION_BIAS(0.001f);
@@ -47,7 +47,7 @@ struct SceneObject
 	 * @param[out]  outIntersectionNormal   Normal vector at the point of intersection (in case there is an intersection)
 	 * @return If there is an intersection, returns the distance from the ray origin to the intersection point. Otherwise, returns a negative number.
 	 */
-	virtual float Intersect(const Ray &incomingRay, glm::vec3 &outIntersectionPoint, glm::vec3 &outIntersectionNormal) = 0;
+	virtual float Intersect(const Ray& incomingRay, glm::vec3& outIntersectionPoint, glm::vec3& outIntersectionNormal) = 0;
 };
 
 // Subclass of SceneObject representing a Sphere scene object
@@ -63,7 +63,7 @@ struct Sphere : public SceneObject
 	 * @param[out]  outIntersectionNormal   Normal vector at the point of intersection (in case there is an intersection)
 	 * @return If there is an intersection, returns the distance from the ray origin to the intersection point. Otherwise, returns a negative number.
 	 */
-	virtual float Intersect(const Ray &incomingRay, glm::vec3 &outIntersectionPoint, glm::vec3 &outIntersectionNormal)
+	virtual float Intersect(const Ray& incomingRay, glm::vec3& outIntersectionPoint, glm::vec3& outIntersectionNormal)
 	{
 		float s(NO_INTERSECTION);
 
@@ -111,7 +111,7 @@ struct Triangle : public SceneObject
 	 * @param[out]  outIntersectionNormal   Normal vector at the point of intersection (in case there is an intersection)
 	 * @return If there is an intersection, returns the distance from the ray origin to the intersection point. Otherwise, returns a negative number.
 	 */
-	virtual float Intersect(const Ray &incomingRay, glm::vec3 &outIntersectionPoint, glm::vec3 &outIntersectionNormal)
+	virtual float Intersect(const Ray& incomingRay, glm::vec3& outIntersectionPoint, glm::vec3& outIntersectionNormal)
 	{
 		float s(NO_INTERSECTION);
 
@@ -167,14 +167,14 @@ struct IntersectionInfo
 {
 	Ray incomingRay;							// Ray used to calculate the intersection
 	float t;											// Distance from the ray's origin to the point of intersection (if there was an intersection).
-	SceneObject *obj;							// Object that the ray intersected with. If this is equal to nullptr, then no intersection occured.
+	SceneObject* obj;							// Object that the ray intersected with. If this is equal to nullptr, then no intersection occured.
 	glm::vec3 intersectionPoint;	// Point where the intersection occured (if there was an intersection)
 	glm::vec3 intersectionNormal; // Normal vector at the point of intersection (if there was an intersection)
 };
 
 struct Scene
 {
-	std::vector<SceneObject *> objects; // List of all objects in the scene
+	std::vector<SceneObject*> objects; // List of all objects in the scene
 	std::vector<Light> lights;					// List of all lights in the scene
 };
 
@@ -189,8 +189,8 @@ struct Image
 	 * @param[in] w Width
 	 * @param[in] h Height
 	 */
-	Image(const int &w, const int &h)
-			: width(w), height(h)
+	Image(const int& w, const int& h)
+		: width(w), height(h)
 	{
 		data.resize(w * h * 3, 0);
 	}
@@ -212,7 +212,7 @@ struct Image
 	 * @param[in] y     Y-coordinate of the pixel
 	 * @param[in] color Pixel color
 	 */
-	void SetColor(const int &x, const int &y, const glm::vec3 &color)
+	void SetColor(const int& x, const int& y, const glm::vec3& color)
 	{
 		int index = (y * width + x) * 3;
 		data[index] = ToChar(color.r);
@@ -229,7 +229,7 @@ struct Image
  * @param[in] aa anti-aliasing
  * @return Ray that passes through the pixel at (x, y)
  */
-Ray GetRayThruPixel(const Camera &camera, const int &pixelX, const int &pixelY, const bool aa = false)
+Ray GetRayThruPixel(const Camera& camera, const int& pixelX, const int& pixelY, const bool aa = false)
 {
 	Ray ray;
 	glm::vec3 cameraLookDirection(glm::normalize(camera.lookTarget - camera.position));
@@ -269,7 +269,7 @@ Ray GetRayThruPixel(const Camera &camera, const int &pixelX, const int &pixelY, 
  * @param[in] scene Scene object
  * @return Returns an IntersectionInfo object that will contain the results of the raycast
  */
-IntersectionInfo Raycast(const Ray &ray, const Scene &scene)
+IntersectionInfo Raycast(const Ray& ray, const Scene& scene)
 {
 	IntersectionInfo ret;
 	IntersectionInfo infoTemp;
@@ -325,10 +325,13 @@ IntersectionInfo Raycast(const Ray &ray, const Scene &scene)
  * @param[in] maxDepth  Maximum depth of the trace
  * @return Resulting color after the ray bounced around the scene
  */
-glm::vec3 RayTrace(const Ray &ray, const Scene &scene, const Camera &camera, int maxDepth = 1)
+glm::vec3 RayTrace(const Ray& ray, const Scene& scene, const Camera& camera, int maxDepth = 1)
 {
 	glm::vec3 color(BACKGROUND_COLOR);
 
+	if (maxDepth < 1)
+		return color;
+	
 	glm::vec3 ambient, diffuse, specular;
 	glm::vec3 directionToLight;
 	float distanceToLight;
@@ -345,6 +348,7 @@ glm::vec3 RayTrace(const Ray &ray, const Scene &scene, const Camera &camera, int
 	IntersectionInfo intersectionInfo = Raycast(ray, scene);
 	if (intersectionInfo.obj != nullptr)
 	{
+		color = glm::vec3();
 		for (size_t i = 0; i < scene.lights.size(); ++i)
 		{
 			// AMBIENT
@@ -352,8 +356,8 @@ glm::vec3 RayTrace(const Ray &ray, const Scene &scene, const Camera &camera, int
 
 			// DIFFUSE
 			directionToLight = (scene.lights[i].position.w == POINT_LIGHT)
-														 ? glm::normalize(glm::vec3(scene.lights[i].position) - intersectionInfo.intersectionPoint)
-														 : glm::normalize(glm::vec3(-scene.lights[i].position));
+				? glm::normalize(glm::vec3(scene.lights[i].position) - intersectionInfo.intersectionPoint)
+				: glm::normalize(glm::vec3(-scene.lights[i].position));
 			diffuseStrength = glm::max(glm::dot(directionToLight, intersectionInfo.intersectionNormal), 0.0f);
 			diffuse = diffuseStrength * intersectionInfo.obj->material.diffuse * scene.lights[i].diffuse;
 
@@ -376,22 +380,20 @@ glm::vec3 RayTrace(const Ray &ray, const Scene &scene, const Camera &camera, int
 			shadowRay.direction = directionToLight;
 			shadowingInfo = Raycast(shadowRay, scene);
 
-			color = ambient;
+			color += ambient;
 
 			// Lit when (.obj is null) or (.obj is not null but distance to intersectionPoint is greater than distance to light)
-			if ((shadowingInfo.obj == nullptr) or ((shadowingInfo.obj != nullptr) and (glm::distance(shadowRay.origin, shadowingInfo.intersectionPoint) > glm::distance(shadowRay.origin, glm::vec3(scene.lights[i].position)))))
+			if ((shadowingInfo.obj == nullptr) or ((shadowingInfo.obj != nullptr) and (shadowingInfo.t > glm::distance(shadowRay.origin, glm::vec3(scene.lights[i].position)))))
 			{
-				color = ambient + ((diffuse + specular) * attenuation);
-			}
-
-			// REFLECTION
-			if (maxDepth > 1)
-			{
+				color += ((diffuse + specular) * attenuation);
+				
+				// REFLECTION
 				reflectionRay.origin = intersectionInfo.intersectionPoint + (intersectionInfo.intersectionNormal * REFLECTION_BIAS);
 				reflectionRay.direction = glm::reflect(intersectionInfo.incomingRay.direction, intersectionInfo.intersectionNormal);
 
 				color += RayTrace(reflectionRay, scene, camera, maxDepth - 1) * intersectionInfo.obj->material.shininess / 128.0f;
 			}
+
 		}
 	}
 
@@ -434,8 +436,8 @@ int main()
 	sceneFile >> maxDepth >> numOfObjects;
 
 	std::string objectType;
-	Sphere *sphere;
-	Triangle *triangle;
+	Sphere* sphere;
+	Triangle* triangle;
 	Material material;
 	for (size_t i = 0; i < numOfObjects; ++i)
 	{
@@ -471,7 +473,7 @@ int main()
 
 	sceneFile >> numOfLights;
 
-	Light *light;
+	Light* light;
 	for (size_t i = 0; i < numOfLights; ++i)
 	{
 		light = new Light();
