@@ -16,7 +16,7 @@ enum LightType
 };
 
 const int NO_INTERSECTION(-1.0f);
-const glm::vec3 BACKGROUND_COLOR(0.0f, 0.0f, 0.0f);
+const glm::vec3 BACKGROUND_COLOR(0.0f, 0.5f, 0.0f);
 const glm::vec3 UP(0.0f, 1.0f, 0.0f);
 const float SHADOW_BIAS(0.001f);
 const float REFLECTION_BIAS(0.001f);
@@ -329,9 +329,6 @@ glm::vec3 RayTrace(const Ray& ray, const Scene& scene, const Camera& camera, int
 {
 	glm::vec3 color(BACKGROUND_COLOR);
 
-	if (maxDepth < 1)
-		return color;
-	
 	glm::vec3 ambient, diffuse, specular;
 	glm::vec3 directionToLight;
 	float distanceToLight;
@@ -383,17 +380,18 @@ glm::vec3 RayTrace(const Ray& ray, const Scene& scene, const Camera& camera, int
 			color += ambient;
 
 			// Lit when (.obj is null) or (.obj is not null but distance to intersectionPoint is greater than distance to light)
-			if ((shadowingInfo.obj == nullptr) or ((shadowingInfo.obj != nullptr) and (shadowingInfo.t > glm::distance(shadowRay.origin, glm::vec3(scene.lights[i].position)))))
+			if ((shadowingInfo.obj == nullptr) or ((shadowingInfo.obj != nullptr) and (glm::distance(shadowRay.origin, shadowingInfo.intersectionPoint) > glm::distance(shadowRay.origin, glm::vec3(scene.lights[i].position)))))
 			{
 				color += ((diffuse + specular) * attenuation);
-				
 				// REFLECTION
-				reflectionRay.origin = intersectionInfo.intersectionPoint + (intersectionInfo.intersectionNormal * REFLECTION_BIAS);
-				reflectionRay.direction = glm::reflect(intersectionInfo.incomingRay.direction, intersectionInfo.intersectionNormal);
+				if (maxDepth > 1)
+				{
+					reflectionRay.origin = intersectionInfo.intersectionPoint + (intersectionInfo.intersectionNormal * REFLECTION_BIAS);
+					reflectionRay.direction = glm::reflect(intersectionInfo.incomingRay.direction, intersectionInfo.intersectionNormal);
 
-				color += RayTrace(reflectionRay, scene, camera, maxDepth - 1) * intersectionInfo.obj->material.shininess / 128.0f;
+					color += RayTrace(reflectionRay, scene, camera, maxDepth - 1) * intersectionInfo.obj->material.shininess / 128.0f;
+				}
 			}
-
 		}
 	}
 
@@ -439,6 +437,8 @@ int main()
 	Sphere* sphere;
 	Triangle* triangle;
 	Material material;
+	sphere = new Sphere();
+	triangle = new Triangle();
 	for (size_t i = 0; i < numOfObjects; ++i)
 	{
 		sceneFile >> objectType;
