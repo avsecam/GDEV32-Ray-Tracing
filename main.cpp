@@ -20,6 +20,7 @@ const glm::vec3 BACKGROUND_COLOR(0.0f, 0.0f, 0.0f);
 const glm::vec3 UP(0.0f, 1.0f, 0.0f);
 const float SHADOW_BIAS(0.001f);
 const float REFLECTION_BIAS(0.001f);
+const float REFLECTIVITY_CONSTANT(128.0f);
 const int SAMPLES_PER_PIXEL(5);
 
 struct Ray
@@ -332,6 +333,7 @@ glm::vec3 RayTrace(const Ray& ray, const Scene& scene, const Camera& camera, int
 	glm::vec3 ambient, diffuse, specular;
 	glm::vec3 directionToLight;
 	float distanceToLight;
+	float distanceToLight;
 	float diffuseStrength;
 	glm::vec3 reflectedLight;
 	float specularStrength;
@@ -345,7 +347,7 @@ glm::vec3 RayTrace(const Ray& ray, const Scene& scene, const Camera& camera, int
 	IntersectionInfo intersectionInfo = Raycast(ray, scene);
 	if (intersectionInfo.obj != nullptr)
 	{
-		color = glm::vec3();
+		// color = glm::vec3();
 		for (size_t i = 0; i < scene.lights.size(); ++i)
 		{
 			// AMBIENT
@@ -379,10 +381,14 @@ glm::vec3 RayTrace(const Ray& ray, const Scene& scene, const Camera& camera, int
 
 			color += ambient;
 
+			distanceToLight = (scene.lights[i].position.w == POINT_LIGHT)
+				? glm::distance(shadowRay.origin, glm::vec3(scene.lights[i].position))
+				: glm::distance(shadowRay.origin, shadowRay.direction * 999.0f);
+			
 			// Lit when (.obj is null) or (.obj is not null but distance to intersectionPoint is greater than distance to light)
-			if ((shadowingInfo.obj == nullptr) or ((shadowingInfo.obj != nullptr) and (glm::distance(shadowRay.origin, shadowingInfo.intersectionPoint) > glm::distance(shadowRay.origin, glm::vec3(scene.lights[i].position)))))
+			if ((shadowingInfo.obj == nullptr) or ((shadowingInfo.obj != nullptr) and (glm::distance(shadowRay.origin, shadowingInfo.intersectionPoint) > distanceToLight)))
 			{
-				color += ((diffuse + specular) * attenuation);
+				color += (diffuse + specular) * attenuation;
 
 				// REFLECTION
 				if (maxDepth > 1)
@@ -390,10 +396,9 @@ glm::vec3 RayTrace(const Ray& ray, const Scene& scene, const Camera& camera, int
 					reflectionRay.origin = intersectionInfo.intersectionPoint + (intersectionInfo.intersectionNormal * REFLECTION_BIAS);
 					reflectionRay.direction = glm::reflect(intersectionInfo.incomingRay.direction, intersectionInfo.intersectionNormal);
 
-					color += RayTrace(reflectionRay, scene, camera, maxDepth - 1) * intersectionInfo.obj->material.shininess / 128.0f;
+					color += RayTrace(reflectionRay, scene, camera, maxDepth - 1) * intersectionInfo.obj->material.shininess / REFLECTIVITY_CONSTANT;
 				}
 			}
-
 		}
 	}
 
