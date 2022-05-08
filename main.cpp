@@ -333,7 +333,6 @@ glm::vec3 RayTrace(const Ray& ray, const Scene& scene, const Camera& camera, int
 	glm::vec3 ambient, diffuse, specular;
 	glm::vec3 directionToLight;
 	float distanceToLight;
-	float distanceToLight;
 	float diffuseStrength;
 	glm::vec3 reflectedLight;
 	float specularStrength;
