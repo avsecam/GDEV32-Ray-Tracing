@@ -350,7 +350,7 @@ glm::vec3 RayTrace(const Ray& ray, const Scene& scene, const Camera& camera, int
 		for (size_t i = 0; i < scene.lights.size(); ++i)
 		{
 			// AMBIENT
-			ambient = intersectionInfo.obj->material.ambient * scene.lights[i].ambient;
+			ambient = intersectionInfo.obj->material.ambient * (scene.lights[i].ambient / static_cast<float>(scene.lights.size()));
 
 			// DIFFUSE
 			directionToLight = (scene.lights[i].position.w == POINT_LIGHT)
@@ -361,7 +361,7 @@ glm::vec3 RayTrace(const Ray& ray, const Scene& scene, const Camera& camera, int
 
 			// SPECULAR
 			reflectedLight = glm::reflect(-directionToLight, intersectionInfo.intersectionNormal);
-			specularStrength = glm::pow(glm::max(glm::dot(reflectedLight, -ray.direction), 0.0f), intersectionInfo.obj->material.shininess);
+			specularStrength = glm::pow(glm::max(glm::dot(reflectedLight, glm::normalize(camera.position - intersectionInfo.intersectionPoint)), 0.0f), intersectionInfo.obj->material.shininess);
 			specular = specularStrength * intersectionInfo.obj->material.specular * scene.lights[i].specular;
 
 			// ATTENUATION
